@@ -1,7 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
 func main() {
-	fmt.Println("Hello World!")
+	if len(os.Args) < 2 {
+		fmt.Printf("Usage: %s <file>\n", os.Args[0])
+		os.Exit(1)
+	}
+
 }
