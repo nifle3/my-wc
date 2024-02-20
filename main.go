@@ -5,31 +5,77 @@ import (
 	"os"
 )
 
+type Arg struct {
+	FileName string
+	Mode     []string
+}
+
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Printf("Usage: %s <file>\n", os.Args[0])
+	arg, err := ParseArgs(os.Args[1:])
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 
-	if len(os.Args) == 2 {
-	} else if len(os.Args) == 3 {
-		if os.Args[1] != "-c" {
-			fmt.Printf("Usage: %s [-c] <file>\n", os.Args[0])
-			os.Exit(1)
-		}
-
-		file, err := os.Open(os.Args[2])
-		if err != nil {
-			fmt.Println(err)
-			os.Exit(1)
-		}
-
-		defer file.Close()
-		statFile, err := file.Stat()
-		fmt.Println(statFile.Size())
-
-	} else {
-		fmt.Printf("Usage: %s [-command] <file>\n", os.Args[0])
+	file, err := os.OpenFile(arg.FileName, os.O_RDONLY, os.FileMode(0644))
+	if err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	defer file.Close()
+
+	result, err := ParseMode(arg.Mode, file)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+
+	fmt.Println(result)
+}
+
+func ParseArgs(args []string) (Arg, error) {
+	if len(args) < 1 {
+		return Arg{}, fmt.Errorf("usage: [mode] <file>")
+	}
+
+	result := Arg{
+		FileName: args[len(args)-1],
+		Mode:     args[:len(args)-1],
+	}
+
+	return result, nil
+}
+
+func ParseMode(args []string, file *os.File) (string, error) {
+	funcs := map[string]func(file *os.File) string{
+		"-c": NumberOfBytes,
+		"-l": NumberOfLines,
+		"-w": NumberOfWords,
+	}
+
+	result := ""
+
+	for _, mode := range args {
+		f, ok := funcs[mode]
+		if !ok {
+			return "", fmt.Errorf("unknown mode: %s", mode)
+		}
+
+		result += f(file)
+	}
+
+	return result, nil
+}
+
+func NumberOfBytes(file *os.File) string {
+	return ""
+}
+
+func NumberOfLines(file *os.File) string {
+	return ""
+}
+
+func NumberOfWords(file *os.File) string {
+	return ""
 }
