@@ -2,10 +2,18 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
+)
+
+const (
+	countWords = "-w"
+	countLines = "-l"
+	countBytes = "-c"
 )
 
 type Arg struct {
@@ -44,9 +52,17 @@ func ParseArgs(args []string) (Arg, error) {
 		return Arg{}, fmt.Errorf("usage: [mode] <file>")
 	}
 
+	var mods []string
+
+	if len(args) == 1 && !strings.HasPrefix(args[0], "-") {
+		mods = []string{countWords, countBytes, countLines}
+	} else {
+		mods = args[:len(args)-1]
+	}
+
 	result := Arg{
 		FileName: args[len(args)-1],
-		Mode:     args[:len(args)-1],
+		Mode:     mods,
 	}
 
 	return result, nil
@@ -54,9 +70,9 @@ func ParseArgs(args []string) (Arg, error) {
 
 func ParseMode(args []string, file *os.File) (string, error) {
 	funcs := map[string]func(file *os.File) (string, error){
-		"-c": NumberOfBytes,
-		"-l": NumberOfLines,
-		"-w": NumberOfWords,
+		countBytes: NumberOfBytes,
+		countLines: NumberOfLines,
+		countWords: NumberOfWords,
 	}
 
 	result := ""
@@ -91,20 +107,41 @@ func NumberOfLines(file *os.File) (string, error) {
 	reader := bufio.NewReader(file)
 	numberOfLines := 0
 
+	buffer := make([]byte, 1024)
+
 	for {
-		_, _, err := reader.ReadLine()
+		c, err := reader.Read(buffer)
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return "", err
 		}
 
-		numberOfLines++
+		numberOfLines += bytes.Count(buffer[:c], []byte{'\n'})
 	}
 
-	return strconv.FormatInt(int64(numberOfLines), 10), nil
+	return strconv.FormatInt(int64(numberOfLines+1), 10), nil
 }
 
 func NumberOfWords(file *os.File) (string, error) {
-	return "", nil
+	reader := bufio.NewReader(file)
+	buffer := make([]byte, 1024)
+	numberOfWords := 0
+
+	for {
+		c, err := reader.Read(buffer)
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+
+		wordInFile := strings.FieldsFunc(string(buffer[:c]), func(r rune) bool {
+			return r == ' ' || r == '\t' || r == '\n' || r == '\r'
+		})
+
+		numberOfWords += len(wordInFile)
+	}
+
+	return strconv.FormatInt(int64(numberOfWords), 10), nil
 }
