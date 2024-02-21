@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 )
 
 type Arg struct {
@@ -48,7 +49,7 @@ func ParseArgs(args []string) (Arg, error) {
 }
 
 func ParseMode(args []string, file *os.File) (string, error) {
-	funcs := map[string]func(file *os.File) string{
+	funcs := map[string]func(file *os.File) (string, error){
 		"-c": NumberOfBytes,
 		"-l": NumberOfLines,
 		"-w": NumberOfWords,
@@ -62,20 +63,42 @@ func ParseMode(args []string, file *os.File) (string, error) {
 			return "", fmt.Errorf("unknown mode: %s", mode)
 		}
 
-		result += f(file)
+		semiResult, err := f(file)
+		if err != nil {
+			return result, err
+		}
+
+		result += semiResult
 	}
 
 	return result, nil
 }
 
-func NumberOfBytes(file *os.File) string {
-	return ""
+func NumberOfBytes(file *os.File) (string, error) {
+	fileStat, err := file.Stat()
+	if err != nil {
+		return "", err
+	}
+
+	return strconv.FormatInt(fileStat.Size(), 10), nil
 }
 
-func NumberOfLines(file *os.File) string {
-	return ""
+func NumberOfLines(file *os.File) (string, error) {
+	result := make([]byte, 0)
+	_, err := file.Read(result)
+	if err != nil {
+		return "", err
+	}
+
+	var numberOfLines int64 = 0
+	for _, val := range result {
+		if val == '\n' {
+			numberOfLines++
+		}
+	}
+	return strconv.FormatInt(numberOfLines, 10), nil
 }
 
-func NumberOfWords(file *os.File) string {
-	return ""
+func NumberOfWords(file *os.File) (string, error) {
+	return "", nil
 }
