@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 )
@@ -31,6 +33,8 @@ func main() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	result += arg.FileName
 
 	fmt.Println(result)
 }
@@ -65,10 +69,10 @@ func ParseMode(args []string, file *os.File) (string, error) {
 
 		semiResult, err := f(file)
 		if err != nil {
-			return result, err
+			return "", err
 		}
 
-		result += semiResult
+		result += semiResult + " "
 	}
 
 	return result, nil
@@ -84,19 +88,21 @@ func NumberOfBytes(file *os.File) (string, error) {
 }
 
 func NumberOfLines(file *os.File) (string, error) {
-	result := make([]byte, 0)
-	_, err := file.Read(result)
-	if err != nil {
-		return "", err
+	reader := bufio.NewReader(file)
+	numberOfLines := 0
+
+	for {
+		_, _, err := reader.ReadLine()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			return "", err
+		}
+
+		numberOfLines++
 	}
 
-	var numberOfLines int64 = 0
-	for _, val := range result {
-		if val == '\n' {
-			numberOfLines++
-		}
-	}
-	return strconv.FormatInt(numberOfLines, 10), nil
+	return strconv.FormatInt(int64(numberOfLines), 10), nil
 }
 
 func NumberOfWords(file *os.File) (string, error) {
