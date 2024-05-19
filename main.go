@@ -29,21 +29,17 @@ func main() {
 		os.Exit(1)
 	}
 
-	var reader *os.File
-
 	if arg.FileName != "" {
-		reader, err = os.OpenFile(arg.FileName, os.O_RDONLY, os.FileMode(0644))
+		reader, err := os.OpenFile(arg.FileName, os.O_RDONLY, os.FileMode(0644))
 		if err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}
-	} else {
-		reader = os.Stdin
+
+		os.Stdin = reader
 	}
 
-	defer reader.Close()
-
-	result, err := ParseMode(arg.Mode, reader)
+	result, err := ParseMode(arg.Mode)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)
@@ -78,8 +74,8 @@ func ParseArgs(args []string) (Arg, error) {
 	return result, nil
 }
 
-func ParseMode(args []string, file *os.File) (string, error) {
-	funcs := map[string]func(reader *os.File) (string, error){
+func ParseMode(args []string) (string, error) {
+	funcs := map[string]func() (string, error){
 		countBytes: NumberOfBytes,
 		countLines: NumberOfLines,
 		countWords: NumberOfWords,
@@ -94,7 +90,7 @@ func ParseMode(args []string, file *os.File) (string, error) {
 			return "", fmt.Errorf("unknown mode: %s", mode)
 		}
 
-		semiResult, err := f(file)
+		semiResult, err := f()
 		if err != nil {
 			return "", err
 		}
@@ -105,8 +101,8 @@ func ParseMode(args []string, file *os.File) (string, error) {
 	return result, nil
 }
 
-func NumberOfBytes(file *os.File) (string, error) {
-	stat, err := file.Stat()
+func NumberOfBytes() (string, error) {
+	stat, err := os.Stdin.Stat()
 	if err != nil {
 		return "", err
 	}
@@ -114,28 +110,26 @@ func NumberOfBytes(file *os.File) (string, error) {
 	return strconv.FormatInt(stat.Size(), 10), nil
 }
 
-func NumberOfLines(file *os.File) (string, error) {
-	bufferReader := bufio.NewReader(file)
+func NumberOfLines() (string, error) {
+	bufferReader := bufio.NewReader(os.Stdin)
 	numberOfLines := 0
 
-	buffer := make([]byte, 1024)
-
 	for {
-		c, err := bufferReader.Read(buffer)
+		_, err := bufferReader.ReadString('\n')
 		if err == io.EOF {
 			break
 		} else if err != nil {
 			return "", err
 		}
 
-		numberOfLines += bytes.Count(buffer[:c], []byte{'\n'})
+		numberOfLines += 1
 	}
 
-	return strconv.FormatInt(int64(numberOfLines+1), 10), nil
+	return strconv.FormatInt(int64(numberOfLines), 10), nil
 }
 
-func NumberOfWords(file *os.File) (string, error) {
-	bufferReader := bufio.NewReader(file)
+func NumberOfWords() (string, error) {
+	bufferReader := bufio.NewReader(os.Stdin)
 	buffer := make([]byte, 1024)
 	numberOfWords := 0
 
@@ -147,7 +141,7 @@ func NumberOfWords(file *os.File) (string, error) {
 			return "", err
 		}
 
-		wordInFile := strings.FieldsFunc(string(buffer[:c]), func(r rune) bool {
+		wordInFile := bytes.FieldsFunc(buffer[:c], func(r rune) bool {
 			return r == ' ' || r == '\t' || r == '\n' || r == '\r'
 		})
 
@@ -157,21 +151,13 @@ func NumberOfWords(file *os.File) (string, error) {
 	return strconv.FormatInt(int64(numberOfWords), 10), nil
 }
 
-func NumberOfChars(file *os.File) (string, error) {
-	bufferReader := bufio.NewReader(file)
-	buffer := make([]byte, 1024)
-	numberOfChars := 0
-
-	for {
-		c, err := bufferReader.Read(buffer)
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return "", err
-		}
-
-		numberOfChars += len(string(buffer[:c]))
+func NumberOfChars() (string, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Split(bufio.ScanRunes)
+	result := 0
+	for scanner.Scan() {
+		result++
 	}
 
-	return strconv.FormatInt(int64(numberOfChars), 10), nil
+	return strconv.FormatInt(int64(result), 10), nil
 }
